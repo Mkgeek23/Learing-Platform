@@ -78,7 +78,15 @@ def generate_summary_prompt(text_content):
     return prompt.strip()
 
 def generate_all_in_one_prompt(text_content, difficulty='medium', num_questions=3):
-    prompt = f""" Jesteś ekspertem od przygotowywania materiałów edukacyjnych. Na podstawie poniższej treści przygotuj KOMPLETNY zestaw materiałów dla lekcji. WYMAGANE ELEMENTY: 1. PODSUMOWANIE (krótkie, esencjonalne, 5-6 punktów). 2. SZCZEGÓŁOWE NOTATKI (format Markdown). 3. QUIZ ({num_questions} pytań, poziom {difficulty}, format JSON). 4. FISZKI (format JSON). 5. MAPA MYŚLI (format Mermaid mindmap). TREŚĆ: {text_content} OCZEKIWANY FORMAT ODPOWIEDZI: Odpowiedz w formacie JSON, który zawiera wszystkie te sekcje. To musi być czysty JSON bez żadnego dodatkowego tekstu ani bloków kodu (```). STRUKTURA JSON: {{ "summary": "Tekst podsumowania w Markdown", "notes": "Tekst szczegółowych notatek w Markdown", "mindmap": "Kod Mermaid mindmap (bez ```, zaczyna się od 'mindmap')", "quiz": [ {{ "question": "Pytanie", "a": "Opcja A", "b": "Opcja B", "c": "Opcja C", "d": "Opcja D", "correct": "A" }} ], "flashcards": [ {{"front": "Pojęcie", "back": "Definicja" }} ] }} """
+    prompt = f""" Jesteś ekspertem od przygotowywania materiałów edukacyjnych. Na podstawie poniższej treści przygotuj KOMPLETNY zestaw materiałów dla lekcji. WYMAGANE ELEMENTY: 1. PODSUMOWANIE (krótkie, esencjonalne, 5-6 punktów). 2. SZCZEGÓŁOWE NOTATKI (format Markdown). 3. QUIZ ({num_questions} pytań, poziom {difficulty}, format JSON). 4. FISZKI (format JSON). 5. MAPA MYŚLI (format Mermaid mindmap). 
+    TREŚĆ: {text_content} 
+    WYMAGANIA DLA QUIZU: Niektóre pytania mogą być wielokrotnego wyboru (więcej niż jedna poprawna odpowiedź). W takim przypadku w polu "correct" podaj wszystkie poprawne litery bez spacji (np. "AB", "ACD"). Jeśli jest tylko jedna poprawna odpowiedź, podaj tylko jedną literę.
+    OCZEKIWANY FORMAT ODPOWIEDZI: Odpowiedz w formacie JSON, który zawiera wszystkie te sekcje. To musi być czysty JSON bez żadnego dodatkowego tekstu ani bloków kodu (```). 
+    STRUKTURA JSON: {{ "summary": "Tekst podsumowania w Markdown", "notes": "Tekst szczegółowych notatek w Markdown", "mindmap": "Kod Mermaid mindmap (bez ```, zaczyna się od 'mindmap')", "quiz": [ {{ "question": "Pytanie", "a": "Opcja A", "b": "Opcja B", "c": "Opcja C", "d": "Opcja D", "correct": "AB" }} ], "flashcards": [ {{"front": "Pojęcie", "back": "Definicja" }} ] }} """
+    return prompt.strip()
+
+def generate_course_plan_prompt(title, description):
+    prompt = f""" Jesteś ekspertem od projektowania programów nauczania. Na podstawie poniższego tytułu i opisu kursu, przygotuj szczegółowy plan kursu podzielony na rozdziały i lekcje. CEL: Stwórz logiczną ścieżkę nauki, która przeprowadzi ucznia od podstaw do zaawansowanych zagadnień. WYMAGANIA: - Zaproponuj 3-5 rozdziałów. - W każdym rozdziale umieść 2-4 lekcje. - Dla każdej lekcji podaj krótki opis, co powinno się w niej znaleźć. TYTUŁ: {title} OPIS: {description} Oczekiwany format: Czysty Markdown. """
     return prompt.strip()
 
 def calculate_sm2(quality, interval, ease_factor, repetitions):

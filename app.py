@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import app, db, User, Course, Chapter, Lesson, Quiz, Question, LessonProgress, QuizAttempt, Flashcard, FlashcardProgress, Enrollment
-from utils import get_video_id, get_transcription, generate_notes, generate_quiz_questions, generate_quiz_prompt, generate_lesson_details_prompt, generate_flashcards_prompt, get_transcription_with_timestamps, generate_summary_prompt, generate_mindmap_prompt, generate_all_in_one_prompt, calculate_sm2
+from utils import get_video_id, get_transcription, generate_notes, generate_quiz_questions, generate_quiz_prompt, generate_lesson_details_prompt, generate_flashcards_prompt, get_transcription_with_timestamps, generate_summary_prompt, generate_mindmap_prompt, generate_all_in_one_prompt, generate_course_plan_prompt, calculate_sm2
 import json
 import markdown
 from datetime import datetime, timedelta
@@ -145,7 +145,6 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        is_admin = True if request.form.get('is_admin') else False
         
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
@@ -154,7 +153,7 @@ def register():
         new_user = User(
             username=username, 
             password=generate_password_hash(password),
-            is_admin=is_admin
+            is_admin=False
         )
         db.session.add(new_user)
         db.session.commit()
@@ -398,7 +397,13 @@ def add_course():
         db.session.add(new_course)
         db.session.commit()
         return redirect(url_for('index'))
-    return render_template('admin/add_course.html')
+
+    # Prompt suggestion for creating a course from a topic
+    course_gen_prompt = """Jesteś ekspertem od projektowania programów nauczania. Chcę stworzyć nowy kurs. 
+Zaproponuj chwytliwy tytuł oraz bogaty merytorycznie opis dla kursu na temat: [WPISZ TUTAJ TEMAT KURSU]. 
+Opis powinien zachęcać do nauki i jasno określać, co uczeń zyska po ukończeniu kursu."""
+
+    return render_template('admin/add_course.html', course_gen_prompt=course_gen_prompt)
 
 @app.route('/admin/course/<int:course_id>/lesson/add', methods=['GET', 'POST'])
 @login_required
@@ -482,7 +487,11 @@ def edit_course(course_id):
         db.session.commit()
         flash('Course updated')
         return redirect(url_for('course_detail', course_id=course.id))
-    return render_template('admin/edit_course.html', course=course)
+    
+    plan_prompt = generate_course_plan_prompt(course.title, course.description)
+    return render_template('admin/edit_course.html', 
+                           course=course, 
+                           course_plan_prompt=plan_prompt)
 
 @app.route('/admin/course/<int:course_id>/chapter/add', methods=['POST'])
 @login_required
@@ -920,4 +929,4 @@ def course_glossary(course_id):
     return render_template('glossary.html', course=course, terms=glossary_terms)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=80)

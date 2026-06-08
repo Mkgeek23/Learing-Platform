@@ -20,12 +20,12 @@
             <div id="flashcard-container" class="position-relative" style="perspective: 1000px; height: 350px;">
                 {% for f in flashcards %}
                 <div class="flashcard w-100 h-100 position-absolute d-none" data-id="{{ f.id }}" data-index="{{ loop.index0 }}">
-                    <div class="flashcard-inner w-100 h-100 position-relative text-center border rounded shadow p-5 bg-white d-flex align-items-center justify-content-center" onclick="flipCard(this)">
-                        <div class="front position-absolute w-100 p-4">
+                    <div class="flashcard-inner w-100 h-100 position-relative text-center border rounded shadow bg-white d-flex align-items-center justify-content-center" onclick="flipCard(this)">
+                        <div class="front position-absolute w-100 h-100 p-4 d-flex flex-column align-items-center justify-content-center">
                             <h4 class="mb-4">{{ f.front }}</h4>
                             <p class="text-muted small">Kliknij, aby odkryć odpowiedź</p>
                         </div>
-                        <div class="back position-absolute w-100 p-4" style="transform: rotateY(180deg); backface-visibility: hidden;">
+                        <div class="back position-absolute w-100 h-100 p-4 d-flex flex-column align-items-center justify-content-center">
                             <h4 class="mb-4">{{ f.back }}</h4>
                         </div>
                     </div>
@@ -62,10 +62,11 @@
 </div>
 
 <style>
-    .flashcard { transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+    .flashcard { cursor: pointer; }
+    .flashcard-inner { transition: transform 0.6s; transform-style: preserve-3d; position: relative; width: 100%; height: 100%; }
     .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
-    .flashcard-inner { transition: transform 0.6s; transform-style: preserve-3d; min-height: 300px; }
-    .front, .back { backface-visibility: hidden; }
+    .front, .back { backface-visibility: hidden; -webkit-backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .back { transform: rotateY(180deg); }
 </style>
 
 <script>

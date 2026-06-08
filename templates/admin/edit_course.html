@@ -23,6 +23,32 @@
                 </form>
             </div>
         </div>
+
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0"><i class="fas fa-robot me-2"></i>Generator Planu Kursu AI</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">Skopiuj poniższy prompt do swojego ulubionego modelu AI (np. ChatGPT, Claude), aby wygenerować strukturę kursu.</p>
+                <textarea id="coursePlanPromptText" class="form-control mb-3" rows="8" readonly style="font-family: monospace; font-size: 0.85rem; background-color: #f8f9fa;">{{ course_plan_prompt }}</textarea>
+                <button class="btn btn-outline-primary fw-bold" onclick="copyPrompt('coursePlanPromptText')">
+                    <i class="fas fa-copy me-2"></i>Kopiuj prompt planu kursu
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+    function copyPrompt(id) {
+        const text = document.getElementById(id);
+        text.select();
+        navigator.clipboard.writeText(text.value);
+        if (typeof showToast === 'function') {
+            showToast('Prompt skopiowany!', 'success');
+        } else {
+            alert('Prompt skopiowany!');
+        }
+    }
+</script>
 {% endblock %}
