@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block content %}
+{% macro lesson_item(lesson) %}
+<div class="list-group-item p-3 d-flex justify-content-between align-items-center" data-id="{{ lesson.id }}">
+    <div class="d-flex align-items-center">
+        <div class="bg-light rounded-circle me-3 text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+            {% if current_user.is_authenticated and lesson.id in completed_lesson_ids %}
+                <i class="fas fa-check-circle text-success"></i>
+            {% else %}
+                {{ lesson.order + 1 }}
+            {% endif %}
+        </div>
+        <div>
+            <a href="{{ url_for('lesson_detail', lesson_id=lesson.id) }}" class="text-decoration-none text-dark {% if not is_enrolled and not current_user.is_admin %}pe-none opacity-75{% endif %}">
+                <h6 class="fw-bold mb-0 {% if current_user.is_authenticated and lesson.id in completed_lesson_ids %}text-muted{% endif %}">
+                    {{ lesson.title }}
+                    {% if not is_enrolled and not current_user.is_admin %}
+                        <i class="fas fa-lock ms-1 small text-muted"></i>
+                    {% endif %}
+                </h6>
+            </a>
+            <span class="text-muted small"><i class="fab fa-youtube me-1"></i>Wideo lekcja</span>
+        </div>
+    </div>
+    <div class="d-flex align-items-center">
+        {% if current_user.is_admin %}
+        <div class="btn-group me-3">
+            <a href="{{ url_for('edit_lesson', lesson_id=lesson.id) }}" class="btn btn-sm btn-outline-primary border-0"><i class="fas fa-edit"></i></a>
+        </div>
+        {% endif %}
+        <i class="fas fa-chevron-right text-muted opacity-50"></i>
+    </div>
+</div>
+{% endmacro %}
+
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+        <li class="breadcrumb-item active">{{ course.title }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+            <div class="bg-primary bg-opacity-10 p-5 text-center position-relative">
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('edit_course', course_id=course.id) }}" class="btn btn-sm btn-white position-absolute top-0 end-0 m-3 shadow-sm">
+                    <i class="fas fa-edit me-1"></i>Edytuj kurs
+                </a>
+                {% endif %}
+                <i class="fas fa-graduation-cap fa-4x text-primary opacity-50 mb-3"></i>
+                <h1 class="fw-bold mb-0">{{ course.title }}</h1>
+            </div>
+            <div class="card-body p-4">
+                {% if current_user.is_authenticated %}
+                <div class="mb-4">
+                    {% if is_enrolled %}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="fw-bold mb-0">Twój postęp w kursie</h6>
+                            <span class="badge bg-primary">{{ course_progress }}%</span>
+                        </div>
+                        <div class="progress mb-3" style="height: 10px;">
+                            <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" role="progressbar" id="courseProgressBar"></div>
+                        </div>
+                        <script>
+                            document.getElementById('courseProgressBar').style.width = '{{ course_progress }}%';
+                        </script>
+
+                        {% if srs_count > 0 %}
+                        <div class="alert alert-info border-0 shadow-sm d-flex justify-content-between align-items-center mb-0 p-3">
+                            <div>
+                                <i class="fas fa-bolt text-warning me-2"></i>
+                                Masz <strong>{{ srs_count }}</strong> fiszek do powtórzenia w tym kursie (tylko z ukończonych lekcji).
+                            </div>
+                            <a href="{{ url_for('global_flashcards', course_id=course.id) }}" class="btn btn-primary btn-sm rounded-pill">
+                                Rozpocznij powtórkę
+                            </a>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-3 bg-light rounded-3">
+                            <h5 class="fw-bold mb-2">Chcesz zacząć ten kurs?</h5>
+                            <p class="text-muted small mb-3">Dołącz do kursu, aby śledzić postępy, rozwiązywać quizy i powtarzać fiszki.</p>
+                            <a href="{{ url_for('join_course', course_id=course.id) }}" class="btn btn-primary px-4 rounded-pill">Dołącz do kursu</a>
+                        </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <h5 class="fw-bold mb-3">O tym kursie</h5>
+                <p class="text-muted mb-0">{{ course.description }}</p>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="fw-bold mb-0">Program kursu</h3>
+            <span class="text-muted">{{ course.lessons|length }} lekcji</span>
+        </div>
+
+        {% if course.chapters %}
+            {% for chapter in course.chapters %}
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-primary d-inline-block me-2">{{ chapter.title }}</h5>
+                        {% if current_user.is_authenticated and chapter.id in chapter_progress %}
+                        <small class="text-muted">{{ chapter_progress[chapter.id] }}%</small>
+                        {% endif %}
+                    </div>
+                    {% if current_user.is_admin %}
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-secondary border-0" data-bs-toggle="modal" data-bs-target="#editChapter{{ chapter.id }}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <form action="{{ url_for('delete_chapter', chapter_id=chapter.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Usunąć ten rozdział? Lekcje zostaną odpięte.')">
+                            <button class="btn btn-sm btn-outline-danger border-0"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="list-group list-group-flush shadow-sm rounded-3 overflow-hidden border mb-3 sortable-lessons" data-chapter-id="{{ chapter.id }}">
+                    {% for lesson in chapter.lessons %}
+                        {{ lesson_item(lesson) }}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        {% set unassigned_lessons = course.lessons | selectattr('chapter_id', 'none') | list %}
+        {% if unassigned_lessons %}
+            {% if course.chapters %}
+            <h5 class="fw-bold mb-2 text-muted">Pozostałe lekcje</h5>
+            {% endif %}
+            <div class="list-group list-group-flush shadow-sm rounded-3 overflow-hidden border mb-4 sortable-lessons" data-chapter-id="unassigned">
+                {% for lesson in unassigned_lessons %}
+                    {{ lesson_item(lesson) }}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if not course.lessons %}
+        <div class="list-group-item p-5 text-center text-muted shadow-sm rounded-3 border">
+            <i class="fas fa-info-circle mb-2 fs-2"></i>
+            <p class="mb-0">Ten kurs nie posiada jeszcze żadnych lekcji.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        {% if current_user.is_admin %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold mb-0"><i class="fas fa-tools text-muted me-2"></i>Panel Admina</h5>
+            </div>
+            <div class="card-body pt-0">
+                <a href="{{ url_for('course_glossary', course_id=course.id) }}" class="btn btn-outline-info w-100 mb-3">
+                    <i class="fas fa-book me-2"></i>Glosariusz kursu
+                </a>
+                <a href="{{ url_for('add_lesson', course_id=course.id) }}" class="btn btn-primary w-100 mb-2">
+                    <i class="fas fa-plus-circle me-2"></i>Dodaj lekcję
+                </a>
+                <button class="btn btn-outline-primary w-100 mb-4" data-bs-toggle="modal" data-bs-target="#addChapterModal">
+                    <i class="fas fa-folder-plus me-2"></i>Dodaj rozdział
+                </button>
+            </div>
+        </div>
+
+        <!-- Modals for Chapters -->
+        <div class="modal fade" id="addChapterModal" tabindex="-1">
+            <div class="modal-dialog">
+                <form action="{{ url_for('add_chapter', course_id=course.id) }}" method="POST" class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Dodaj nowy rozdział</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="text" name="title" class="form-control" placeholder="Tytuł rozdziału" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-primary">Dodaj</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% for chapter in course.chapters %}
+        <div class="modal fade" id="editChapter{{ chapter.id }}" tabindex="-1">
+            <div class="modal-dialog">
+                <form action="{{ url_for('edit_chapter', chapter_id=chapter.id) }}" method="POST" class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edytuj rozdział</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="text" name="title" class="form-control" value="{{ chapter.title }}" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-primary">Zapisz</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="card border-0 shadow-sm bg-indigo text-white p-4 text-center">
+            <h5 class="fw-bold mb-3">Gotowy na naukę?</h5>
+            {% if course.lessons %}
+                {% if is_enrolled or current_user.is_admin %}
+                    <a href="{{ url_for('lesson_detail', lesson_id=course.lessons[0].id) }}" class="btn btn-light fw-bold w-100 mb-3">Rozpocznij kurs</a>
+                {% else %}
+                    <a href="{{ url_for('join_course', course_id=course.id) }}" class="btn btn-light fw-bold w-100 mb-3">Dołącz i rozpocznij</a>
+                {% endif %}
+            {% else %}
+                <button class="btn btn-light fw-bold w-100 mb-3" disabled>Wkrótce dostępne</button>
+            {% endif %}
+            <a href="{{ url_for('course_glossary', course_id=course.id) }}" class="btn btn-outline-light btn-sm w-100 mb-3">
+                <i class="fas fa-book me-2"></i>Glosariusz kursu
+            </a>
+            {% if is_enrolled %}
+                <hr class="bg-white opacity-25">
+                <a href="{{ url_for('leave_course', course_id=course.id) }}" class="btn btn-link btn-sm text-white text-decoration-none opacity-75" onclick="return confirm('Czy na pewno chcesz zrezygnować z tego kursu?')">
+                    <i class="fas fa-sign-out-alt me-1"></i>Zrezygnuj z kursu
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if current_user.is_admin %}
+<script>
+document.querySelectorAll('.sortable-lessons').forEach(el => {
+    new Sortable(el, {
+        group: 'lessons',
+        animation: 150,
+        ghostClass: 'bg-light',
+        onEnd: function (evt) {
+            const lessonId = evt.item.dataset.id;
+            const newChapterId = evt.to.dataset.chapterId;
+            const order = Array.from(evt.to.children).map(child => child.dataset.id);
+            
+            fetch('/api/admin/reorder-lessons', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    order: order,
+                    chapter_id: newChapterId
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast('Kolejność lekcji zaktualizowana', 'success');
+                } else {
+                    showToast('Błąd aktualizacji kolejności', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Błąd połączenia', 'danger');
+            });
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

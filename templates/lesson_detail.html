@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% block content %}
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Mermaid: DOMContentLoaded");
+        mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'loose',
+            theme: 'default',
+            suppressErrors: false
+        });
+
+        var accordionElement = document.getElementById('collapseMindmap');
+        if (accordionElement) {
+            accordionElement.addEventListener('shown.bs.collapse', function () {
+                console.log("Mermaid: Accordion shown, running mermaid.run()");
+                mermaid.run({
+                    nodes: document.querySelectorAll('.mermaid'),
+                }).catch(err => console.error("Mermaid run error:", err));
+            });
+            
+            // Jeśli akordeon jest już otwarty (np. przez klasę 'show')
+            if (accordionElement.classList.contains('show')) {
+                mermaid.run({
+                    nodes: document.querySelectorAll('.mermaid'),
+                });
+            }
+        } else {
+            console.error("Mermaid: Element #collapseMindmap not found");
+        }
+    });
+</script>
+{% macro lesson_sidebar_item(l, idx) %}
+<a href="{{ url_for('lesson_detail', lesson_id=l.id) }}" 
+   class="list-group-item list-group-item-action lesson-item p-3 border-0 {{ 'active' if l.id == lesson.id else '' }}">
+    <div class="d-flex align-items-center">
+        <div class="me-3">
+            {% if l.id in completed_lesson_ids %}
+                <i class="fas fa-check-circle text-success fs-5"></i>
+            {% else %}
+                <i class="far fa-circle text-muted fs-5"></i>
+            {% endif %}
+        </div>
+        <div class="flex-grow-1">
+            <div class="small text-muted mb-1">Lekcja {{ idx }}</div>
+            <div class="fw-bold">{{ l.title }}</div>
+        </div>
+        {% if l.quizzes and l.quizzes[0].id in quiz_scores %}
+            <span class="badge bg-success rounded-pill small">{{ quiz_scores[l.quizzes[0].id] }}</span>
+        {% endif %}
+    </div>
+</a>
+{% endmacro %}
+<style>
+    .lesson-main-content {
+        line-height: 1.8;
+        font-size: 1.1rem;
+        color: #374151; /* Lepszy kontrast niż czysty czarny */
+    }
+    
+    .lesson-main-content h2, .lesson-main-content h3 {
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        font-weight: 700;
+        color: #111827;
+    }
+
+    .lesson-sidebar {
+        height: calc(100vh - 120px);
+        position: sticky;
+        top: 100px;
+        overflow-y: auto;
+        padding-right: 5px;
+    }
+    .lesson-item {
+        border-left: 4px solid transparent;
+        transition: all 0.2s ease;
+        border-radius: 0.5rem !important;
+        margin-bottom: 4px;
+    }
+    .lesson-item.active {
+        background-color: #eff6ff !important;
+        border-left-color: #4f46e5;
+        color: #1e40af;
+    }
+    .lesson-item:hover:not(.active) {
+        background-color: #f3f4f6;
+        transform: translateX(4px);
+    }
+    .timestamp-link {
+        display: inline-flex;
+        align-items: center;
+        background: #eef2ff;
+        color: #4f46e5;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        text-decoration: none;
+    }
+    .timestamp-link:hover {
+        background: #4f46e5;
+        color: white;
+        transform: translateY(-1px);
+    }
+    .timestamp-link i {
+        font-size: 0.75rem;
+        margin-right: 4px;
+    }
+    .video-container {
+        border-radius: 1.25rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+    }
+    
+    /* Quiz improvements */
+    .form-check {
+        transition: all 0.2s;
+        cursor: pointer;
+        border: 1px solid transparent;
+    }
+    .form-check:hover {
+        background-color: #f9fafb;
+        border-color: #e5e7eb;
+    }
+    .form-check-input:checked + .form-check-label {
+        font-weight: 600;
+        color: #4f46e5;
+    }
+
+    .icon-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+    }
+</style>
+
+<div class="row">
+    <!-- Main Content -->
+    <div class="col-lg-8">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('course_detail', course_id=lesson.course_id) }}">{{ lesson.course.title }}</a></li>
+                <li class="breadcrumb-item active">{{ lesson.title }}</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 class="h2 fw-bold mb-0">{{ lesson.title }}</h1>
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('edit_lesson', lesson_id=lesson.id) }}" class="btn btn-outline-warning btn-sm border-0">
+                    <i class="fas fa-edit me-1"></i>Edytuj (Admin)
+                </a>
+            {% endif %}
+        </div>
+        
+        {% if lesson.youtube_url %}
+        <div class="video-container mb-4">
+            <div class="ratio ratio-16x9">
+                <iframe id="yt-player" src="https://www.youtube.com/embed/{{ video_id }}?enablejsapi=1" allowfullscreen></iframe>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if lesson.content %}
+        <div class="lesson-main-content mb-4 p-4 bg-white shadow-sm rounded-3">
+            {{ lesson.content | markdown | safe }}
+        </div>
+        {% endif %}
+
+        {% if lesson.summary %}
+        <div class="card mb-4 border-0 bg-light shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3"><i class="fas fa-lightbulb text-warning me-2"></i>W skrócie</h5>
+                <div class="lesson-summary small text-muted">
+                    {{ lesson.summary | markdown | safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                {% if prev_lesson %}
+                    <a href="{{ url_for('lesson_detail', lesson_id=prev_lesson.id) }}" class="btn btn-light border">
+                        <i class="fas fa-chevron-left me-2"></i>Poprzednia
+                    </a>
+                {% endif %}
+            </div>
+            
+            <button id="btn-complete" class="btn btn-primary btn-lg px-5 shadow-sm rounded-pill transition" data-lesson-id="{{ lesson.id }}">
+                <i class="fas fa-check-circle me-2"></i>Oznacz lekcję jako ukończoną
+            </button>
+
+            <div>
+                {% if next_lesson %}
+                    <a href="{{ url_for('lesson_detail', lesson_id=next_lesson.id) }}" class="btn btn-light border">
+                        Następna<i class="fas fa-chevron-right ms-2"></i>
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('course_detail', course_id=lesson.course_id) }}" class="btn btn-success">
+                        Ukończ kurs<i class="fas fa-flag-checkered ms-2"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="accordion mb-4" id="lessonResourcesAccordion">
+          
+          <!-- Mind Map -->
+          {% if lesson.mindmap %}
+          <div class="accordion-item border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold p-4" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMindmap">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box me-3 bg-info bg-opacity-10 rounded">
+                        <i class="fas fa-sitemap text-info"></i>
+                    </div>
+                    <span>Interaktywna Mapa Myśli</span>
+                </div>
+              </button>
+            </h2>
+            <div id="collapseMindmap" class="accordion-collapse collapse" data-bs-parent="#lessonResourcesAccordion">
+              <div class="accordion-body bg-white text-center" style="min-height: 200px;">
+                <div class="mermaid">
+{{ lesson.mindmap|safe }}
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <!-- Summaries (formerly Notes) -->
+          <div class="accordion-item border-0 shadow-sm rounded-3 overflow-hidden mb-3">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold p-4" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNotes">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box me-3 bg-warning bg-opacity-10 rounded">
+                        <i class="fas fa-sticky-note text-warning"></i>
+                    </div>
+                    <span>Podsumowania</span>
+                </div>
+              </button>
+            </h2>
+            <div id="collapseNotes" class="accordion-collapse collapse" data-bs-parent="#lessonResourcesAccordion">
+              <div class="accordion-body bg-white">
+                <div class="lesson-notes">
+                    {{ lesson.notes | markdown | safe }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transcription -->
+          {% if lesson.youtube_url %}
+          <div class="accordion-item border-0 shadow-sm rounded-3 overflow-hidden">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold p-4" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTranscription">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box me-3 bg-secondary bg-opacity-10 rounded">
+                        <i class="fas fa-file-alt text-muted"></i>
+                    </div>
+                    <span>Transkrypcja wideo</span>
+                </div>
+              </button>
+            </h2>
+            <div id="collapseTranscription" class="accordion-collapse collapse" data-bs-parent="#lessonResourcesAccordion">
+              <div class="accordion-body bg-light">
+                <div class="p-2" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6;">
+                    {{ lesson.transcription }}
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Quiz Section (Async) -->
+        {% if lesson.quizzes %}
+        {% set quiz = lesson.quizzes[0] %}
+        <div class="card mb-4 border-0" id="quiz-card">
+            <div class="card-header bg-white py-3 border-0">
+                <h4 class="fw-bold mb-0"><i class="fas fa-question-circle text-primary me-2"></i>Sprawdź swoją wiedzę</h4>
+            </div>
+            <div class="card-body p-4 pt-0">
+                <div id="quiz-container">
+                    {% if quiz.id in quiz_scores %}
+                        <div class="alert alert-success border-0 shadow-sm">
+                            <h5 class="fw-bold"><i class="fas fa-trophy me-2"></i>Wynik: {{ quiz_scores[quiz.id] }}</h5>
+                            <p class="mb-0">Ukończyłeś już ten quiz. Możesz go powtórzyć w dowolnym momencie.</p>
+                            <button class="btn btn-outline-success btn-sm mt-3" onclick="showQuiz()">Rozpocznij ponownie</button>
+                        </div>
+                    {% else %}
+                        <button class="btn btn-primary" onclick="showQuiz()">Rozpocznij Quiz</button>
+                    {% endif %}
+                </div>
+                
+                <div id="quiz-questions" style="display: none;">
+                    <form id="quiz-form">
+                        {% for question in quiz.questions %}
+                        <div class="mb-4 pb-4 border-bottom last-child-border-0">
+                            <h5 class="fw-bold mb-3">{{ loop.index }}. {{ question.text }}</h5>
+                            {% set is_multiple = question.correct_option | length > 1 %}
+                            {% if is_multiple %}
+                                <p class="text-muted small"><i class="fas fa-info-circle me-1"></i>Wybierz wszystkie poprawne odpowiedzi</p>
+                            {% endif %}
+                            
+                            {% for opt, label in [('A', question.option_a), ('B', question.option_b), ('C', question.option_c), ('D', question.option_d)] %}
+                            <div class="form-check mb-2 p-2 rounded transition" id="container_{{ question.id }}{{ opt }}">
+                                <input class="form-check-input" type="{{ 'checkbox' if is_multiple else 'radio' }}" 
+                                       name="question_{{ question.id }}" value="{{ opt }}" id="q{{ question.id }}{{ opt }}">
+                                <label class="form-check-label d-block w-100" for="q{{ question.id }}{{ opt }}">
+                                    <span class="fw-bold me-2">{{ opt }}.</span> {{ label }}
+                                </label>
+                                <div id="feedback_{{ question.id }}{{ opt }}" class="small mt-1 fw-bold" style="display: none;"></div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                        <button type="button" class="btn btn-primary" id="btn-submit-quiz" data-quiz-id="{{ quiz.id }}">Wyślij odpowiedzi</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <div class="lesson-sidebar">
+            <div class="card mb-4 border-0">
+                <div class="card-body p-0">
+                    <div class="p-3 bg-white border-bottom">
+                        <h5 class="fw-bold mb-0">Lekcje w kursie</h5>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('course_glossary', course_id=lesson.course_id) }}" class="list-group-item list-group-item-action bg-info bg-opacity-10 text-info fw-bold border-0 text-center py-2">
+                            <i class="fas fa-book me-2"></i>Glosariusz kursu
+                        </a>
+                        {% set ns = namespace(lesson_count=0) %}
+                        {% if lesson.course.chapters %}
+                            {% for chapter in lesson.course.chapters %}
+                                <div class="bg-light p-2 small fw-bold text-muted border-bottom">{{ chapter.title }}</div>
+                                {% for l in chapter.lessons %}
+                                    {% set ns.lesson_count = ns.lesson_count + 1 %}
+                                    {{ lesson_sidebar_item(l, ns.lesson_count) }}
+                                {% endfor %}
+                            {% endfor %}
+                            
+                            {% set unassigned = lesson.course.lessons | selectattr('chapter_id', 'none') | list %}
+                            {% if unassigned %}
+                                <div class="bg-light p-2 small fw-bold text-muted border-bottom">Pozostałe</div>
+                                {% for l in unassigned %}
+                                    {% set ns.lesson_count = ns.lesson_count + 1 %}
+                                    {{ lesson_sidebar_item(l, ns.lesson_count) }}
+                                {% endfor %}
+                            {% endif %}
+                        {% else %}
+                            {% for l in course_lessons %}
+                                {{ lesson_sidebar_item(l, loop.index) }}
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4 border-0 bg-warning bg-opacity-10">
+                <div class="card-body p-4 text-center">
+                    <h5 class="fw-bold mb-2">Utrwal wiedzę</h5>
+                    <p class="small text-muted mb-3">Wykorzystaj fiszki, aby lepiej zapamiętać kluczowe pojęcia z tej lekcji.</p>
+                    {% if lesson.flashcards %}
+                        {% if lesson.id in completed_lesson_ids %}
+                            <a href="{{ url_for('lesson_flashcards', lesson_id=lesson.id) }}" class="btn btn-warning w-100 fw-bold">
+                                <i class="fas fa-bolt me-2"></i>Otwórz Fiszki
+                            </a>
+                        {% else %}
+                            <button class="btn btn-outline-warning w-100 fw-bold opacity-50" disabled data-bs-toggle="tooltip" title="Ukończ lekcję, aby odblokować fiszki">
+                                <i class="fas fa-lock me-2"></i>Fiszki zablokowane
+                            </button>
+                            <p class="small text-muted mt-2 mb-0">Ukończ lekcję, aby odblokować fiszki.</p>
+                        {% endif %}
+                    {% else %}
+                        <button class="btn btn-outline-secondary btn-sm w-100" disabled>Brak fiszek</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showQuiz() {
+        document.getElementById('quiz-container').style.display = 'none';
+        document.getElementById('quiz-questions').style.display = 'block';
+    }
+
+    async function submitQuiz(quizId) {
+        const form = document.getElementById('quiz-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            if (!data[key]) {
+                data[key] = [];
+            }
+            data[key].push(value);
+        }
+
+        try {
+            const response = await fetch(`/api/quiz/${quizId}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                // Show feedback for each question
+                result.results.forEach(res => {
+                    ['A', 'B', 'C', 'D'].forEach(opt => {
+                        const container = document.getElementById(`container_${res.question_id}${opt}`);
+                        const feedback = document.getElementById(`feedback_${res.question_id}${opt}`);
+                        const isCorrectOption = res.correct_option.includes(opt);
+                        const isUserAnswer = res.user_answer.includes(opt);
+
+                        if (isCorrectOption) {
+                            container.classList.add('bg-success', 'bg-opacity-10', 'border', 'border-success', 'shadow-sm');
+                            feedback.innerHTML = '<i class="fas fa-check-circle me-1"></i>Poprawna odpowiedź';
+                            feedback.className = 'small mt-1 fw-bold text-success animate__animated animate__fadeIn';
+                            feedback.style.display = 'block';
+                            container.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
+                        } else if (isUserAnswer && !isCorrectOption) {
+                            container.classList.add('bg-danger', 'bg-opacity-10', 'border', 'border-danger');
+                            feedback.innerHTML = '<i class="fas fa-times-circle me-1"></i>Błędna odpowiedź';
+                            feedback.className = 'small mt-1 fw-bold text-danger animate__animated animate__shakeX';
+                            feedback.style.display = 'block';
+                        }
+                    });
+                });
+
+                document.getElementById('btn-submit-quiz').style.display = 'none';
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'alert alert-info border-0 shadow-sm mt-4';
+                resultDiv.innerHTML = `
+                    <h5 class="fw-bold"><i class="fas fa-chart-bar me-2"></i>Twój wynik: ${result.score}/${result.total}</h5>
+                    <button class="btn btn-primary btn-sm mt-2" onclick="location.reload()">Zakończ i wróć do lekcji</button>
+                `;
+                document.getElementById('quiz-questions').appendChild(resultDiv);
+                
+                showToast('Quiz zakończony!', 'success');
+            }
+        } catch (error) {
+            showToast('Błąd podczas przesyłania quizu.', 'danger');
+        }
+    }
+
+    async function markCompleted(lessonId) {
+        try {
+            const response = await fetch(`/api/lesson/${lessonId}/complete`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                showToast('Lekcja oznaczona jako zakończona!', 'success');
+                // Optional: Update UI to show checkmark without reload
+                location.reload(); // Quickest way to update sidebar status for now, or we could do it with JS
+            }
+        } catch (error) {
+            showToast('Błąd podczas aktualizacji postępu.', 'danger');
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const btnComplete = document.getElementById('btn-complete');
+        if (btnComplete) {
+            btnComplete.addEventListener('click', () => markCompleted(btnComplete.dataset.lessonId));
+        }
+
+        const btnSubmitQuiz = document.getElementById('btn-submit-quiz');
+        if (btnSubmitQuiz) {
+            btnSubmitQuiz.addEventListener('click', () => submitQuiz(btnSubmitQuiz.dataset.quizId));
+        }
+
+        const notesContainer = document.querySelector(".lesson-notes");
+        if (!notesContainer) return;
+
+        const timestampRegex = /\[(\d{1,2}:)?(\d{1,2}):(\d{2})\]/g;
+        notesContainer.innerHTML = notesContainer.innerHTML.replace(timestampRegex, function(match, hh, mm, ss) {
+            let totalSeconds = 0;
+            if (hh) {
+                totalSeconds += parseInt(hh.replace(":", "")) * 3600;
+            }
+            totalSeconds += parseInt(mm) * 60;
+            totalSeconds += parseInt(ss);
+
+            return `<a href="#" class="timestamp-link" data-seconds="${totalSeconds}"><i class="fas fa-play"></i>${match}</a>`;
+        });
+
+        document.querySelectorAll(".timestamp-link").forEach(link => {
+            link.addEventListener("click", function(e) {
+                e.preventDefault();
+                const seconds = this.getAttribute("data-seconds");
+                const iframe = document.getElementById("yt-player");
+                if (iframe) {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                        "event": "command",
+                        "func": "seekTo",
+                        "args": [seconds, true]
+                    }), "*");
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                        "event": "command",
+                        "func": "playVideo",
+                        "args": []
+                    }), "*");
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+    });
+</script>
+
+{% endblock %}

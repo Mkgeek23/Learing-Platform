@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Główna</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('course_detail', course_id=course.id) }}">{{ course.title }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Glosariusz</li>
+      </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Glosariusz kursu: {{ course.title }}</h2>
+        <span class="badge bg-primary rounded-pill">{{ terms|length }} pojęć</span>
+    </div>
+
+    {% if terms %}
+    <div class="list-group">
+        {% for term in terms %}
+            <div class="list-group-item list-group-item-action mb-2 shadow-sm rounded border-0">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1 text-primary">{{ term.front }}</h5>
+                    <small class="text-muted">
+                        <a href="{{ url_for('lesson_detail', lesson_id=term.lesson.id) }}" class="text-decoration-none">
+                            Lekcja: {{ term.lesson.title }}
+                        </a>
+                    </small>
+                </div>
+                <p class="mb-1 text-dark">{{ term.back }}</p>
+            </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info shadow-sm">
+        Ten kurs nie posiada jeszcze żadnych pojęć w glosariuszu. Pojęcia są automatycznie dodawane z fiszek przypisanych do lekcji.
+    </div>
+    {% endif %}
+    
+    <div class="mt-4">
+        <a href="{{ url_for('course_detail', course_id=course.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Powrót do kursu
+        </a>
+    </div>
+</div>
+{% endblock %}

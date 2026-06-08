@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('course_detail', course_id=quiz.lesson.course_id) }}">{{ quiz.lesson.course.title }}</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('lesson_detail', lesson_id=quiz.lesson_id) }}">{{ quiz.lesson.title }}</a></li>
+                <li class="breadcrumb-item active">Quiz</li>
+            </ol>
+        </nav>
+
+        <div class="card border-0 shadow-sm overflow-hidden rounded-4">
+            <div class="card-header bg-primary text-white py-4 px-4 border-0">
+                <div class="d-flex align-items-center">
+                    <div class="bg-white bg-opacity-20 rounded-circle p-3 me-3">
+                        <i class="fas fa-question-circle fs-3 text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold mb-0">Quiz: {{ quiz.lesson.title }}</h3>
+                        <p class="mb-0 opacity-75">Sprawdź swoją wiedzę z tej lekcji</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <form id="quiz-form">
+                    {% for question in quiz.questions %}
+                    <div class="mb-5 pb-5 border-bottom last-child-border-0">
+                        <div class="d-flex align-items-start mb-3">
+                            <span class="badge bg-light text-primary fs-6 me-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;">{{ loop.index }}</span>
+                            <h4 class="fw-bold mb-0">{{ question.text }}</h4>
+                        </div>
+                        
+                        {% set is_multiple = question.correct_option | length > 1 %}
+                        {% if is_multiple %}
+                            <div class="alert alert-light border-0 py-2 px-3 mb-3 small d-inline-block">
+                                <i class="fas fa-info-circle me-1 text-primary"></i>Wybierz wszystkie poprawne odpowiedzi
+                            </div>
+                        {% endif %}
+                        
+                        <div class="row g-3">
+                            {% for opt, label in [('A', question.option_a), ('B', question.option_b), ('C', question.option_c), ('D', question.option_d)] %}
+                            <div class="col-md-6">
+                                <div class="form-check p-3 rounded-3 border transition h-100" id="container_{{ question.id }}{{ opt }}">
+                                    <input class="form-check-input ms-0 me-2" type="{{ 'checkbox' if is_multiple else 'radio' }}" 
+                                           name="question_{{ question.id }}" value="{{ opt }}" id="q{{ question.id }}{{ opt }}">
+                                    <label class="form-check-label d-block w-100 cursor-pointer" for="q{{ question.id }}{{ opt }}">
+                                        <span class="fw-bold me-1">{{ opt }}.</span> {{ label }}
+                                    </label>
+                                    <div id="feedback_{{ question.id }}{{ opt }}" class="small mt-1 fw-bold" style="display: none;"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="pt-2 text-center">
+                        <button type="button" class="btn btn-primary btn-lg px-5 fw-bold rounded-pill shadow" id="btn-submit-quiz" data-quiz-id="{{ quiz.id }}">
+                            Wyślij odpowiedzi<i class="fas fa-paper-plane ms-2"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function submitQuiz(quizId) {
+        const form = document.getElementById('quiz-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            if (!data[key]) {
+                data[key] = [];
+            }
+            data[key].push(value);
+        }
+
+        try {
+            const response = await fetch(`/api/quiz/${quizId}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                result.results.forEach(res => {
+                    ['A', 'B', 'C', 'D'].forEach(opt => {
+                        const container = document.getElementById(`container_${res.question_id}${opt}`);
+                        const feedback = document.getElementById(`feedback_${res.question_id}${opt}`);
+                        const isCorrectOption = res.correct_option.includes(opt);
+                        const isUserAnswer = res.user_answer.includes(opt);
+
+                        if (isCorrectOption) {
+                            container.classList.add('bg-success', 'bg-opacity-10', 'border-success');
+                            feedback.innerHTML = '<i class="fas fa-check me-1"></i>Poprawna odpowiedź';
+                            feedback.className = 'small mt-1 fw-bold text-success';
+                            feedback.style.display = 'block';
+                        } else if (isUserAnswer && !isCorrectOption) {
+                            container.classList.add('bg-danger', 'bg-opacity-10', 'border-danger');
+                            feedback.innerHTML = '<i class="fas fa-times me-1"></i>Błędna odpowiedź';
+                            feedback.className = 'small mt-1 fw-bold text-danger';
+                            feedback.style.display = 'block';
+                        }
+                    });
+                });
+
+                document.getElementById('btn-submit-quiz').style.display = 'none';
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'alert alert-info border-0 shadow-sm mt-5 p-4 rounded-4 text-center';
+                resultDiv.innerHTML = `
+                    <div class="fs-1 mb-2">🎉</div>
+                    <h3 class="fw-bold mb-2">Twój wynik: ${result.score}/${result.total}</h3>
+                    <p class="text-muted mb-4">Wszystkie odpowiedzi zostały sprawdzone. Poprawne opcje są zaznaczone na zielono.</p>
+                    <a href="{{ url_for('lesson_detail', lesson_id=quiz.lesson_id) }}" class="btn btn-primary px-4 rounded-pill">
+                        Wróć do lekcji<i class="fas fa-arrow-right ms-2"></i>
+                    </a>
+                `;
+                document.getElementById('quiz-form').appendChild(resultDiv);
+                
+                showToast('Quiz zakończony!', 'success');
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }
+        } catch (error) {
+            showToast('Błąd podczas przesyłania quizu.', 'danger');
+        }
+    }
+
+    document.getElementById('btn-submit-quiz').addEventListener('click', function() {
+        submitQuiz(this.dataset.quizId);
+    });
+</script>
+{% endblock %}

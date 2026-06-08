@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.idea/
+.idea/*
+.vscode/
+*.swp
+*.swo
+
+# Database
+instance/
+*.db
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local env files
+.env
+.flaskenv
+
+# Other
+utils.py_new

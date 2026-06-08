@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            {% if is_global %}
+                {% if course %}
+                    <h2>Powtórki z kursu: {{ course.title }}</h2>
+                {% else %}
+                    <h2>Twoje Powtórki (Wszystkie kursy)</h2>
+                {% endif %}
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Powrót do strony głównej</a>
+            {% else %}
+                <h2>Fiszki: {{ lesson.title }}</h2>
+                <a href="{{ url_for('lesson_detail', lesson_id=lesson.id) }}" class="btn btn-secondary">Powrót do lekcji</a>
+            {% endif %}
+        </div>
+
+        {% if flashcards %}
+            <div id="flashcard-container" class="position-relative" style="perspective: 1000px; height: 350px;">
+                {% for f in flashcards %}
+                <div class="flashcard w-100 h-100 position-absolute d-none" data-id="{{ f.id }}" data-index="{{ loop.index0 }}">
+                    <div class="flashcard-inner w-100 h-100 position-relative text-center border rounded shadow p-5 bg-white d-flex align-items-center justify-content-center" onclick="flipCard(this)">
+                        <div class="front position-absolute w-100 p-4">
+                            <h4 class="mb-4">{{ f.front }}</h4>
+                            <p class="text-muted small">Kliknij, aby odkryć odpowiedź</p>
+                        </div>
+                        <div class="back position-absolute w-100 p-4" style="transform: rotateY(180deg); backface-visibility: hidden;">
+                            <h4 class="mb-4">{{ f.back }}</h4>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="srs-controls" class="mt-4 d-none">
+                <p class="text-center fw-bold mb-3">Jak dobrze to pamiętasz?</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button class="btn btn-danger btn-sm" onclick="rateCard(0)">Znowu (0)</button>
+                    <button class="btn btn-warning btn-sm" onclick="rateCard(2)">Trudno (2)</button>
+                    <button class="btn btn-primary btn-sm" onclick="rateCard(4)">Dobrze (4)</button>
+                    <button class="btn btn-success btn-sm" onclick="rateCard(5)">Łatwo (5)</button>
+                </div>
+            </div>
+
+            <div id="navigation-controls" class="d-flex justify-content-between mt-4">
+                <button class="btn btn-outline-secondary btn-sm" onclick="prevCard()">Poprzednia</button>
+                <span id="card-indicator" class="align-self-center fw-bold text-primary">1 / {{ flashcards | length }}</span>
+                <button class="btn btn-outline-secondary btn-sm" onclick="nextCard()">Następna</button>
+            </div>
+        {% else %}
+            <div class="alert alert-success shadow-sm">
+                <i class="fas fa-check-circle me-2"></i>{% if is_global %}Wszystkie zaplanowane powtórki zostały wykonane!{% else %}Wszystkie fiszki z tej lekcji zostały powtórzone!{% endif %} Wróć jutro.
+            </div>
+            {% if is_global %}
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">Wróć do Dashboardu</a>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .flashcard { transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+    .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+    .flashcard-inner { transition: transform 0.6s; transform-style: preserve-3d; min-height: 300px; }
+    .front, .back { backface-visibility: hidden; }
+</style>
+
+<script>
+    let currentIndex = 0;
+    const cards = document.querySelectorAll('.flashcard');
+    const indicator = document.getElementById('card-indicator');
+    const srsControls = document.getElementById('srs-controls');
+
+    function showCard(index) {
+        cards.forEach(c => c.classList.add('d-none'));
+        cards[index].classList.remove('d-none');
+        cards[index].classList.remove('flipped');
+        if (indicator) {
+            indicator.innerText = (index + 1) + ' / ' + cards.length;
+        }
+        if (srsControls) {
+            srsControls.classList.add('d-none');
+        }
+    }
+
+    function flipCard(element) {
+        const card = element.closest('.flashcard');
+        card.classList.toggle('flipped');
+        if (card.classList.contains('flipped')) {
+            srsControls.classList.remove('d-none');
+        } else {
+            srsControls.classList.add('d-none');
+        }
+    }
+
+    function nextCard() {
+        currentIndex = (currentIndex + 1) % cards.length;
+        showCard(currentIndex);
+    }
+
+    function prevCard() {
+        currentIndex = (currentIndex - 1 + cards.length) % cards.length;
+        showCard(currentIndex);
+    }
+
+    async function rateCard(quality) {
+        const cardId = cards[currentIndex].dataset.id;
+        try {
+            const response = await fetch(`/api/flashcard/${cardId}/review`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ quality: quality })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showToast(`Zapisano! Kolejna powtórka za ${data.interval} dni.`, 'success');
+                setTimeout(() => {
+                    location.reload(); 
+                }, 1000);
+            } else {
+                showToast('Błąd serwera: ' + (data.error || 'Nieznany błąd'), 'danger');
+            }
+        } catch (error) {
+            console.error('SRS Error:', error);
+            showToast('Błąd połączenia podczas zapisywania postępu.', 'danger');
+        }
+    }
+
+    if (cards.length > 0) {
+        showCard(0);
+    }
+</script>
+{% endblock %}

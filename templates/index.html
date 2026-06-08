@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-5 align-items-center">
+    <div class="col-lg-7">
+        <h1 class="display-4 fw-bold mb-3">Rozwijaj swoje umiejętności z <span class="text-primary">LearnPlatform</span></h1>
+        <p class="lead text-muted mb-4">Przekształcaj filmy z YouTube w interaktywne lekcje z notatkami, quizami i fiszkami wspieranymi przez AI.</p>
+        {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 me-2">Zacznij teraz</a>
+            <a href="#courses" class="btn btn-outline-secondary btn-lg px-4">Przeglądaj kursy</a>
+        {% endif %}
+    </div>
+    <div class="col-lg-5 d-none d-lg-block">
+        <img src="https://img.freepik.com/free-vector/online-learning-concept-illustration_114360-1110.jpg" alt="E-learning" class="img-fluid rounded-4 shadow-sm">
+    </div>
+</div>
+
+{% if current_user.is_authenticated %}
+<div class="card border-0 shadow-sm mb-5 bg-primary text-white overflow-hidden">
+    <div class="card-body p-4 position-relative">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h3 class="fw-bold mb-2">Witaj ponownie, {{ current_user.username }}!</h3>
+                <p class="mb-0 opacity-75">Masz dzisiaj <span class="badge bg-white text-primary fs-6">{{ srs_count }}</span> fiszek do powtórzenia (tylko z ukończonych lekcji).</p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                {% if srs_count > 0 %}
+                    <a href="{{ url_for('global_flashcards') }}" class="btn btn-light btn-lg px-4 fw-bold">Rozpocznij powtórki</a>
+                {% else %}
+                    <button class="btn btn-light btn-lg px-4 fw-bold" disabled>Wszystko opanowane!</button>
+                {% endif %}
+            </div>
+        </div>
+        <i class="fas fa-graduation-cap position-absolute top-50 end-0 translate-middle-y me-4 opacity-25 d-none d-lg-block" style="font-size: 5rem;"></i>
+    </div>
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated and my_courses %}
+<div id="my-courses" class="mb-4">
+    <h2 class="fw-bold mb-3 text-primary">Moje Kursy</h2>
+    <div class="row">
+        {% for course in my_courses %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm overflow-hidden border-start border-primary border-4">
+                <div class="bg-primary bg-opacity-10 py-5 text-center position-relative">
+                    <i class="fas fa-book-open fa-3x text-primary opacity-50"></i>
+                    {% if course_srs_counts[course.id] > 0 %}
+                    <span class="position-absolute top-0 end-0 mt-3 me-3 badge rounded-pill bg-danger">
+                        {{ course_srs_counts[course.id] }} powtórek
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold">{{ course.title }}</h5>
+                    
+                    {% if course.id in course_progress %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted fw-bold">Postęp</small>
+                            <small class="text-primary fw-bold">{{ course_progress[course.id] }}%</small>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-primary rounded-pill" style="width: {{ course_progress[course.id] }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between align-items-center mt-auto">
+                        <span class="badge bg-light text-dark fw-normal"><i class="fas fa-layer-group me-1"></i>{{ course.lessons|length }} lekcji</span>
+                        <div>
+                            {% if course_srs_counts[course.id] > 0 %}
+                                <a href="{{ url_for('global_flashcards', course_id=course.id) }}" class="btn btn-outline-success btn-sm rounded-pill me-1" title="Powtórz fiszki">
+                                    <i class="fas fa-bolt"></i>
+                                </a>
+                            {% endif %}
+                            <a href="{{ url_for('course_detail', course_id=course.id) }}" class="btn btn-primary btn-sm px-3 rounded-pill">Kontynuuj</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div id="courses" class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold mb-0">{% if current_user.is_authenticated and my_courses %}Odkrywaj Nowe Kursy{% else %}Dostępne Kursy{% endif %}</h2>
+        {% if current_user.is_admin %}
+            <a href="{{ url_for('add_course') }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-plus me-1"></i>Dodaj Kurs</a>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        {% if other_courses %}
+            {% for course in other_courses %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 border-0 shadow-sm overflow-hidden">
+                    <div class="bg-secondary bg-opacity-10 py-5 text-center">
+                        <i class="fas fa-graduation-cap fa-3x text-secondary opacity-50"></i>
+                    </div>
+                    <div class="card-body p-4">
+                        <h5 class="card-title fw-bold">{{ course.title }}</h5>
+                        <p class="card-text text-muted small mb-4">{{ course.description[:120] }}{% if course.description|length > 120 %}...{% endif %}</p>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-auto">
+                            <span class="badge bg-light text-dark fw-normal"><i class="fas fa-layer-group me-1"></i>{{ course.lessons|length }} lekcji</span>
+                            <a href="{{ url_for('course_detail', course_id=course.id) }}" class="btn btn-outline-primary btn-sm px-3 rounded-pill">Szczegóły</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            {% if not my_courses %}
+            <div class="col-12 text-center py-5">
+                <p class="text-muted">Obecnie nie ma dostępnych kursów.</p>
+            </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

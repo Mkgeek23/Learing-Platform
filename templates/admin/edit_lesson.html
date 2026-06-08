@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .prompt-textarea {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.8rem;
+        background-color: #f8fafc;
+        border: 1px dashed #cbd5e1;
+    }
+    .question-card {
+        transition: var(--transition);
+        border: 1px solid #e2e8f0;
+    }
+    .question-card:hover {
+        border-color: var(--primary-color);
+    }
+    .section-header {
+        border-bottom: 2px solid #f1f5f9;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .ai-box {
+        background-color: #f0f7ff;
+        border-left: 4px solid #3b82f6;
+    }
+    .bg-indigo-light {
+        background-color: #eef2ff;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('course_detail', course_id=lesson.course_id) }}">{{ lesson.course.title }}</a></li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold">{% if is_new %}Dokończ tworzenie lekcji{% else %}Edycja lekcji{% endif %}</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('lesson_detail', lesson_id=lesson.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-eye me-2"></i>Podgląd lekcji
+            </a>
+        </div>
+    </div>
+
+    <!-- Section 1: Basic Info & Content -->
+    <div class="card mb-4 border-0 shadow-sm">
+        <div class="card-body p-4">
+            <div class="section-header">
+                <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-edit me-2"></i>Informacje podstawowe i treść</h5>
+            </div>
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label fw-semibold small">Tytuł lekcji</label>
+                        <input type="text" name="title" class="form-control" value="{{ lesson.title }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold small">Rozdział</label>
+                        <select name="chapter_id" class="form-select">
+                            <option value="">-- Brak rozdziału --</option>
+                            {% for ch in chapters %}
+                            <option value="{{ ch.id }}" {% if lesson.chapter_id == ch.id %}selected{% endif %}>{{ ch.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Główna treść lekcji (Tekst/Transkrypcja)</label>
+                    <textarea name="content" class="form-control" rows="10">{{ lesson.content or lesson.transcription }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">YouTube URL (opcjonalnie)</label>
+                    <input type="url" name="youtube_url" class="form-control" value="{{ lesson.youtube_url or '' }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Podsumowanie (Markdown)</label>
+                    <textarea name="summary" class="form-control" rows="4" placeholder="Krótkie podsumowanie wiedzy...">{{ lesson.summary }}</textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold small">Notatki (Markdown)</label>
+                    <textarea name="notes" class="form-control" rows="12">{{ lesson.notes }}</textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold small">Mapa myśli (Mermaid mindmap)</label>
+                    <textarea name="mindmap" class="form-control prompt-textarea" rows="6" placeholder="Wklej kod Mermaid mindmap...">{{ lesson.mindmap }}</textarea>
+                </div>
+
+                <button type="submit" name="update_lesson" class="btn btn-primary px-4 fw-bold">
+                    <i class="fas fa-save me-2"></i>Zapisz zmiany w treści
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Section 2: AI Generator Tools -->
+    <div class="card mb-4 border-0 shadow-sm ai-box overflow-hidden">
+        <div class="card-body p-4">
+            <div class="section-header">
+                <h5 class="fw-bold mb-0"><i class="fas fa-robot me-2"></i>Generator Promptów AI</h5>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-lg-4 border-end">
+                    <h6 class="fw-bold mb-3 small text-uppercase text-muted">Konfiguracja</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Trudność Quizu</label>
+                        <select id="difficulty-selector" class="form-select border-0 shadow-sm" onchange="updatePrompts()">
+                            <option value="easy">Łatwy</option>
+                            <option value="medium" selected>Średni</option>
+                            <option value="hard">Trudny</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Liczba pytań</label>
+                        <input type="number" id="num-questions" class="form-control border-0 shadow-sm" value="3" min="1" max="20" onchange="updatePrompts()">
+                    </div>
+                    <button class="btn btn-primary w-100 fw-bold mb-4" onclick="updatePrompts()">
+                        <i class="fas fa-sync-alt me-2"></i>Odśwież prompty
+                    </button>
+
+                    <h6 class="fw-bold mb-3 small text-uppercase text-muted">Szybki Import (All-in-one)</h6>
+                    <form method="POST">
+                        <textarea name="all_in_one_json" class="form-control border-0 shadow-sm mb-3" rows="6" placeholder='Wklej zbiorczy JSON...' required style="font-family: monospace; font-size: 0.75rem;"></textarea>
+                        <button type="submit" name="add_all_in_one_json" class="btn btn-indigo w-100 fw-bold text-white shadow-sm">
+                            <i class="fas fa-check-circle me-2"></i>Aktualizuj wszystko
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="col-lg-8">
+                    <h6 class="fw-bold mb-3 small text-uppercase text-muted">Prompty do skopiowania</h6>
+                    <div class="nav nav-pills mb-3" id="v-pills-tab" role="tablist">
+                        <button class="nav-link active btn-sm me-2 mb-2" id="v-pills-all-tab" data-bs-toggle="pill" data-bs-target="#v-pills-all" type="button">Wszystko w jednym</button>
+                        <button class="nav-link btn-sm me-2 mb-2" id="v-pills-notes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-notes" type="button">Notatki</button>
+                        <button class="nav-link btn-sm me-2 mb-2" id="v-pills-quiz-tab" data-bs-toggle="pill" data-bs-target="#v-pills-quiz" type="button">Quiz</button>
+                        <button class="nav-link btn-sm me-2 mb-2" id="v-pills-flashcards-tab" data-bs-toggle="pill" data-bs-target="#v-pills-flashcards" type="button">Fiszki</button>
+                        <button class="nav-link btn-sm me-2 mb-2" id="v-pills-mindmap-tab" data-bs-toggle="pill" data-bs-target="#v-pills-mindmap" type="button">Mapa myśli</button>
+                    </div>
+                    
+                    <div class="tab-content border rounded-3 p-3 bg-white" id="v-pills-tabContent">
+                        <div class="tab-pane fade show active" id="v-pills-all">
+                            <textarea id="allInOnePromptText" class="form-control prompt-textarea mb-2" rows="10" readonly>{{ all_in_one_prompt }}</textarea>
+                            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="copyPrompt('allInOnePromptText')">Kopiuj zbiorczy prompt</button>
+                        </div>
+                        <div class="tab-pane fade" id="v-pills-notes">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Notatki:</label>
+                                    <textarea id="notesPromptText" class="form-control prompt-textarea mb-2" rows="6" readonly>{{ notes_prompt }}</textarea>
+                                    <button class="btn btn-sm btn-outline-primary w-100 mb-3" onclick="copyPrompt('notesPromptText')">Kopiuj notatki</button>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Podsumowanie:</label>
+                                    <textarea id="summaryPromptText" class="form-control prompt-textarea mb-2" rows="6" readonly>{{ summary_prompt }}</textarea>
+                                    <button class="btn btn-sm btn-outline-primary w-100" onclick="copyPrompt('summaryPromptText')">Kopiuj podsumowanie</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="v-pills-quiz">
+                            <textarea id="quizPromptText" class="form-control prompt-textarea mb-2" rows="10" readonly>{{ quiz_prompt }}</textarea>
+                            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="copyPrompt('quizPromptText')">Kopiuj prompt quizu</button>
+                        </div>
+                        <div class="tab-pane fade" id="v-pills-flashcards">
+                            <textarea id="flashcardsPromptText" class="form-control prompt-textarea mb-2" rows="10" readonly>{{ flashcards_prompt }}</textarea>
+                            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="copyPrompt('flashcardsPromptText')">Kopiuj prompt fiszek</button>
+                        </div>
+                        <div class="tab-pane fade" id="v-pills-mindmap">
+                            <textarea id="mindmapPromptText" class="form-control prompt-textarea mb-2" rows="10" readonly>{{ mindmap_prompt }}</textarea>
+                            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="copyPrompt('mindmapPromptText')">Kopiuj prompt mapy myśli</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Section 3: Quiz Management -->
+        <div class="col-lg-6">
+            <div class="card mb-4 border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="section-header d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0 text-success"><i class="fas fa-tasks me-2"></i>Quiz i Pytania</h5>
+                        <span class="badge bg-success bg-opacity-10 text-success">{{ questions|length }} pytań</span>
+                    </div>
+
+                    {% if questions %}
+                        <div class="mb-4 sortable-questions" style="max-height: 600px; overflow-y: auto;">
+                            {% for q in questions %}
+                            <div class="question-card rounded-3 p-3 mb-3 bg-light bg-opacity-50" data-id="{{ q.id }}">
+                                <form method="POST">
+                                    <input type="hidden" name="question_id" value="{{ q.id }}">
+                                    <div class="mb-3">
+                                        <input type="text" name="text" class="form-control fw-bold border-0 bg-transparent" value="{{ q.text }}" required>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-md-6"><div class="input-group input-group-sm"><span class="input-group-text border-0">A</span><input type="text" name="option_a" class="form-control border-0" value="{{ q.option_a }}" required></div></div>
+                                        <div class="col-md-6"><div class="input-group input-group-sm"><span class="input-group-text border-0">B</span><input type="text" name="option_b" class="form-control border-0" value="{{ q.option_b }}" required></div></div>
+                                        <div class="col-md-6"><div class="input-group input-group-sm"><span class="input-group-text border-0">C</span><input type="text" name="option_c" class="form-control border-0" value="{{ q.option_c }}" required></div></div>
+                                        <div class="col-md-6"><div class="input-group input-group-sm"><span class="input-group-text border-0">D</span><input type="text" name="option_d" class="form-control border-0" value="{{ q.option_d }}" required></div></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <label class="small fw-bold me-2">Poprawne:</label>
+                                            <input type="text" name="correct_option" class="form-control form-control-sm text-center fw-bold" style="width: 70px;" value="{{ q.correct_option }}" required>
+                                        </div>
+                                        <div class="btn-group shadow-sm">
+                                            <button type="submit" name="move_question" value="up" class="btn btn-white btn-sm px-3" title="W górę"><i class="fas fa-arrow-up text-muted"></i></button>
+                                            <button type="submit" name="move_question" value="down" class="btn btn-white btn-sm px-3" title="W dół"><i class="fas fa-arrow-down text-muted"></i></button>
+                                            <button type="submit" name="edit_question" class="btn btn-white btn-sm px-3 text-primary" title="Zapisz"><i class="fas fa-check"></i></button>
+                                            <button type="submit" name="delete_question" class="btn btn-white btn-sm px-3 text-danger" title="Usuń" onclick="return confirm('Usunąć to pytanie?')"><i class="fas fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="p-3 border rounded-3 bg-light">
+                        <h6 class="fw-bold mb-3 small text-uppercase">Importuj pytania (JSON)</h6>
+                        <form method="POST">
+                            <input type="hidden" name="difficulty" id="current-difficulty-hidden" value="{{ difficulty }}">
+                            <div class="mb-3">
+                                <textarea name="quiz_json" class="form-control prompt-textarea" rows="4" placeholder='Wklej wygenerowany JSON z quizem...' required></textarea>
+                            </div>
+                            <button type="submit" name="add_quiz_json" class="btn btn-success btn-sm w-100 fw-bold py-2">
+                                <i class="fas fa-plus me-2"></i>Dodaj pytania do lekcji
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Flashcards Management -->
+        <div class="col-lg-6">
+            <div class="card mb-4 border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <div class="section-header d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0 text-warning"><i class="fas fa-bolt me-2"></i>Fiszki</h5>
+                        {% if lesson.flashcards %}
+                        <form action="{{ url_for('delete_all_flashcards', lesson_id=lesson.id) }}" method="POST" onsubmit="return confirm('Usunąć WSZYSTKIE fiszki?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger border-0 py-0">Usuń wszystkie</button>
+                        </form>
+                        {% endif %}
+                    </div>
+
+                    {% if lesson.flashcards %}
+                        <div class="list-group list-group-flush mb-4 rounded-3 border overflow-hidden" style="max-height: 400px; overflow-y: auto;">
+                        {% for f in lesson.flashcards %}
+                            <div class="list-group-item bg-light bg-opacity-25 py-3">
+                                <form action="{{ url_for('edit_flashcard', flashcard_id=f.id) }}" method="POST">
+                                    <div class="mb-2">
+                                        <input type="text" name="front" class="form-control form-control-sm fw-bold border-0 bg-transparent" value="{{ f.front }}" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <textarea name="back" class="form-control form-control-sm border-0 bg-transparent" rows="2" required>{{ f.back }}</textarea>
+                                    </div>
+                                    <div class="d-flex justify-content-end">
+                                        <button type="submit" class="btn btn-sm btn-link text-primary p-0 me-3 text-decoration-none">Zapisz</button>
+                                        <button type="submit" formaction="{{ url_for('delete_flashcard', flashcard_id=f.id) }}" class="btn btn-sm btn-link text-danger p-0 text-decoration-none" onclick="return confirm('Usunąć tę fiszkę?')">Usuń</button>
+                                    </div>
+                                </form>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="row g-3">
+                        <div class="col-md-12 mb-2">
+                            <div class="p-3 bg-light rounded-3">
+                                <h6 class="fw-bold mb-3 small text-uppercase">Dodaj jedną fiszkę</h6>
+                                <form action="{{ url_for('add_flashcard', lesson_id=lesson.id) }}" method="POST">
+                                    <div class="mb-2">
+                                        <input type="text" name="front" class="form-control form-control-sm" placeholder="Pojęcie" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <textarea name="back" class="form-control form-control-sm" rows="2" placeholder="Definicja" required></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-outline-warning btn-sm w-100 fw-bold text-dark">Dodaj fiszkę</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="p-3 bg-light rounded-3">
+                                <h6 class="fw-bold mb-3 small text-uppercase">Importuj fiszki (JSON)</h6>
+                                <form method="POST">
+                                    <div class="mb-2">
+                                        <textarea name="flashcards_json" class="form-control prompt-textarea" rows="4" placeholder='Wklej wygenerowany JSON z fiszkami...' required></textarea>
+                                    </div>
+                                    <button type="submit" name="add_flashcards_json" class="btn btn-warning btn-sm w-100 fw-bold text-dark">
+                                        <i class="fas fa-plus me-2"></i>Dodaj zbiorczo
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function copyPrompt(id) {
+        const text = document.getElementById(id);
+        text.select();
+        navigator.clipboard.writeText(text.value);
+        showToast('Prompt skopiowany!', 'success');
+    }
+
+    async function updatePrompts() {
+        const difficulty = document.getElementById('difficulty-selector').value;
+        const numQuestions = document.getElementById('num-questions').value;
+        const diffHidden = document.getElementById('current-difficulty-hidden');
+        if (diffHidden) {
+            diffHidden.value = difficulty;
+        }
+        
+        try {
+            const response = await fetch(`/api/admin/lesson/{{ lesson.id }}/prompts?difficulty=${difficulty}&num_questions=${numQuestions}`);
+            const data = await response.json();
+            
+            document.getElementById('quizPromptText').value = data.quiz_prompt;
+            document.getElementById('notesPromptText').value = data.notes_prompt;
+            document.getElementById('flashcardsPromptText').value = data.flashcards_prompt;
+            document.getElementById('summaryPromptText').value = data.summary_prompt;
+            document.getElementById('mindmapPromptText').value = data.mindmap_prompt;
+            document.getElementById('allInOnePromptText').value = data.all_in_one_prompt;
+            
+            showToast('Prompty zaktualizowane!', 'info');
+        } catch (error) {
+            showToast('Błąd podczas aktualizacji promptów.', 'danger');
+        }
+    }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+new Sortable(document.querySelector('.sortable-questions'), {
+    animation: 150,
+    ghostClass: 'bg-light',
+    onEnd: function (evt) {
+        const order = Array.from(evt.to.children).map(el => el.dataset.id);
+        fetch('/api/admin/reorder-questions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ order: order })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('Kolejność pytań zaktualizowana', 'success');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

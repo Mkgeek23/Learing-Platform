@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Lesson to {{ course.title }}</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label>Lesson Title</label>
+        <input type="text" name="title" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label>Chapter (Optional)</label>
+        <select name="chapter_id" class="form-control">
+            <option value="">No Chapter</option>
+            {% for chapter in chapters %}
+            <option value="{{ chapter.id }}">{{ chapter.title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label>YouTube URL (opcjonalnie)</label>
+        <input type="url" name="youtube_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+    </div>
+    <div class="mb-3">
+        <label>Treść lekcji (wymagane jeśli brak wideo)</label>
+        <textarea name="content" class="form-control" rows="10" placeholder="Wpisz treść lekcji tutaj..."></textarea>
+        <div class="form-text">Po dodaniu lekcji zostaniesz przeniesiony do panelu AI, gdzie wygenerujesz materiały.</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Dodaj Lekcję i Rozpocznij AI</button>
+</form>
+{% endblock %}
